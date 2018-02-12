@@ -70,9 +70,14 @@ Roomba690Accessory.prototype = {
         log("Connected to Roomba, getting current status");
 
         myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(currentState) {
-          var phase = currentState.cleanMissionStatus.phase;
           log("Roomba status is %s", JSON.stringify(currentState, null, 4));
 
+          if (currentState.cleanMissionStatus.notReady) {
+            log("Roomba is not ready %s", currentState.cleanMissionStatus.notReady);
+            throw new Error("Roomba is not ready");
+          }
+
+          var phase = currentState.cleanMissionStatus.phase;
           if (state) {
             if (phase == "stuck") {
               log("Roomba is stuck and can't start cleaning");
@@ -177,10 +182,15 @@ Roomba690Accessory.prototype = {
             log("Connected to Roomba");
 
             myRobotViaLocal.getRobotState(['cleanMissionStatus']).then((function(state) {
-
                 myRobotViaLocal.end();
 
                 log("Roomba status is %s", JSON.stringify(state, null, 4));
+
+                if (currentState.cleanMissionStatus.notReady) {
+                  log("Roomba is not ready %s", currentState.cleanMissionStatus.notReady);
+                  callback(new Error("Roomba is not ready"));
+                  return;
+                }
 
                 switch (state.cleanMissionStatus.phase) {
                     case "run":
@@ -198,7 +208,6 @@ Roomba690Accessory.prototype = {
                 }
 
             })).catch(function(err) {
-
                 myRobotViaLocal.end();
 
                 log("Unable to determine power state of Roomba");
