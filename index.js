@@ -186,8 +186,8 @@ Roomba690Accessory.prototype = {
 
                 log("Roomba status is %s", JSON.stringify(state, null, 4));
 
-                if (currentState.cleanMissionStatus.notReady) {
-                  log("Roomba is not ready %s", currentState.cleanMissionStatus.notReady);
+                if (state.cleanMissionStatus.notReady) {
+                  log("Roomba is not ready %s", state.cleanMissionStatus.notReady);
                   callback(new Error("Roomba is not ready"));
                   return;
                 }
