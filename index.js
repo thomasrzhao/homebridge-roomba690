@@ -70,9 +70,8 @@ Roomba690Accessory.prototype = {
         myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(currentState) {
           var phase = currentState.cleanMissionStatus.phase;
           log("Roomba phase is %s", phase);
-          var isRunning = phase == "run";
 
-          if (state && !isRunning) {
+          if (state && phase != "run") {
             log("Starting Roomba");
             myRobotViaLocal.start().then(function(response) {
               myRobotViaLocal.end();
@@ -81,47 +80,64 @@ Roomba690Accessory.prototype = {
               log(response);
               callback();
             });
-          } else if (!state && isRunning) {
-            log("Pausing Roomba");
-            myRobotViaLocal.pause().then(function(response) {
-              log('Roomba is paused');
-              // We call back so Siri can show success.
-              callback();
+          } else if (!state) {
+            if (phase == "run") {
+              log("Pausing Roomba");
+              myRobotViaLocal.pause().then(function(response) {
+                log('Roomba is paused with phase %s', phase);
+                // We call back so Siri can show success.
+                callback();
 
-              // We still have to dock!
-              log("Requesting that Roomba return to dock");
-              var checkStatus = function (time) {
-                setTimeout(function() {
-                  log('Checking Roomba status');
+                // We still have to dock!
+                log("Requesting that Roomba return to dock");
+                var checkStatus = function (time) {
+                  setTimeout(function() {
+                    log('Checking Roomba status');
 
-                  myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(state) {
-                    log ("Status is [%s]", state.cleanMissionStatus.phase);
-                    switch (state.cleanMissionStatus.phase) {
-                      case "stop":
-                        log("Roomba has stopped, issuing dock request");
+                    myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(state) {
+                      log ("Status is [%s]", state.cleanMissionStatus.phase);
+                      switch (state.cleanMissionStatus.phase) {
+                        case "stop":
+                          log("Roomba has stopped, issuing dock request");
 
-                        myRobotViaLocal.dock().then(function(response) {
-                          log('Roomba docking');
+                          myRobotViaLocal.dock().then(function(response) {
+                            log('Roomba docking');
+                            myRobotViaLocal.end();
+                          });
+                          break;
+                        case "run":
+                          log('Roomba is still running. Will check again in 3 seconds');
+                          checkStatus(3000);
+                          break;
+                        default:
                           myRobotViaLocal.end();
-                        });
-                        break;
-                      case "run":
-                        log('Roomba is still running. Will check again in 3 seconds');
-                        checkStatus(3000);
-                        break;
-                      default:
-                        myRobotViaLocal.end();
-                        log('Roomba is not running');
-                        break;
-                    }
-                  });
-                }, time);
-              };
-              checkStatus(3000);
-            });
+                          log('Roomba is not running');
+                          break;
+                      }
+                    });
+                  }, time);
+                };
+                checkStatus(3000);
+              });
+            } else if (phase == "stop" || phase == "pause") {
+              // Roomba is not docked, docking, or stuck, so send it back to the dock
+              myRobotViaLocal.dock().then(function(response) {
+                callback();
+                log('Roomba docking');
+                myRobotViaLocal.end();
+              });
+            } else if (phase == "stuck") {
+              log("Roomba is stuck and can't return to dock");
+              throw new Error("Roomba is stuck and can't return to dock");
+            } else {
+              callback();
+              log("Roomba is in-state %s for %s, not doing anything", phase, state);
+              myRobotViaLocal.end();
+            }
           } else {
-            log("Roomba is already in state");
             callback();
+            log("Roomba is in-state %s for %s, not doing anything", phase, state);
+            myRobotViaLocal.end();
           }
         }).catch(function(err) {
           myRobotViaLocal.end();
