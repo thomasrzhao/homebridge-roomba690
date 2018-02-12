@@ -91,7 +91,12 @@ Roomba690Accessory.prototype = {
                 // We still have to dock!
                 log("Requesting that Roomba return to dock");
                 var checkStatus = function (time) {
-                  setTimeout(function() {
+                  if (this.setPowerStateTimeoutID) {
+                    clearTimeout(this.setPowerStateTimeoutID);
+                    delete this.setPowerStateTimeoutID;
+                  }
+                  this.setPowerStateTimeoutID = setTimeout(function() {
+                    delete this.setPowerStateTimeoutID;
                     log('Checking Roomba status');
 
                     myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(state) {
