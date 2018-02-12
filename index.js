@@ -10,7 +10,7 @@ module.exports = function(homebridge) {
 /**
  * Roomba690Accessory
  *
- * @method Roomba690Accessory 
+ * @method Roomba690Accessory
  * @param {Object} log
  * @param {Object} config config.json
  * @param {String} config.name Name of Roomba to show in Home app
@@ -37,7 +37,7 @@ function Roomba690Accessory(log, config) {
  * Roomba690Accessory
  *
  * Provides the following functions:
- * setPowerState()
+ * Roomba690Accessorytate()
  * getPowerState()
  * getIsCharging()
  * getBatteryLevel()
@@ -49,7 +49,7 @@ Roomba690Accessory.prototype = {
   /**
    * setPowerState
    *
-   * @method setPowerState   
+   * @method setPowerState
    * @param {int} state 0 or 1
    * @param {function} callback
    *
@@ -57,119 +57,85 @@ Roomba690Accessory.prototype = {
    *
    */
     setPowerState: function(state, callback) {
+      var log = this.log;
 
-        var log = this.log;
+      log("Request to set power state to [%s]", state);
 
-        log("Request to set power state to [%s]", state);
+      var myRobotViaLocal = new dorita980.Local(this.blid, this.password, this.hostname);
 
-        var myRobotViaLocal = new dorita980.Local(this.blid, this.password, this.hostname);
-        
-        if (state) {
+      log("Connecting to Roomba");
+      myRobotViaLocal.on('connect', function() {
+        log("Connected to Roomba, getting current status");
 
+        myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(currentState) {
+          var phase = currentState.cleanMissionStatus.phase;
+          log("Roomba phase is %s", phase);
+          var isRunning = phase == "run";
+
+          if (state && !isRunning) {
             log("Starting Roomba");
+            myRobotViaLocal.start().then(function(response) {
+              myRobotViaLocal.end();
 
-            myRobotViaLocal.on('connect', function() {
-    
-                log("Connected to Roomba");
-
-                myRobotViaLocal.start().then((response) => {
-
-                    myRobotViaLocal.end();
-
-                    log("Roomba started.");
-                    log(response);
-                    callback();
-
-                }).catch((err) => {
-
-                    myRobotViaLocal.end();
-
-                    log("Failed to start Roomba. Error was [%s]", err.message);
-                    log(response);
-
-                    callback(err);
-
-                });
+              log("Roomba started");
+              log(response);
+              callback();
             });
-
-        } else {
-
-            // The below code block is essentially the same as homebridge-roomba980
-            // with the exception of getMission, which is changed to getRobotState.
-            // Logging has been tweaked a little, but the core code is the same.
-
-            // TODO - Do we need to accommodate the "pause" phase in our dock request?
-
+          } else if (!state && isRunning) {
             log("Pausing Roomba");
+            myRobotViaLocal.pause().then(function(response) {
+              log('Roomba is paused');
+              // We call back so Siri can show success.
+              callback();
 
-            myRobotViaLocal.on('connect', function () {
-                myRobotViaLocal.pause().then((response) => {
-                    log('Roomba is paused');
+              // We still have to dock!
+              log("Requesting that Roomba return to dock");
+              var checkStatus = function (time) {
+                setTimeout(function() {
+                  log('Checking Roomba status');
 
-                    // We call back so Siri can show success.
-                    callback();
+                  myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(state) {
+                    log ("Status is [%s]", state.cleanMissionStatus.phase);
+                    switch (state.cleanMissionStatus.phase) {
+                      case "stop":
+                        log("Roomba has stopped, issuing dock request");
 
-                    // We still have to dock!
-                    log("Requesting that Roomba return to dock")
-                    var checkStatus = function (time) {
-                        setTimeout(
-                            function () {
-                                log('Checking Roomba status');
-
-                                myRobotViaLocal.getRobotState(['cleanMissionStatus']).then((function(state) {
-
-                                    log ("Status is [%s]", state.cleanMissionStatus.phase);
-
-                                    switch (state.cleanMissionStatus.phase) {
-                                        case "stop":
-                                            
-                                            log("Roomba has stopped, issuing dock request");
-
-                                            myRobotViaLocal.dock().then(((response) => {
-                                                myRobotViaLocal.end();
-                                                log('Roomba docking');
-                                                //callback();
-                                            })).catch((err) => {
-                                                log('Roomba failed: %s', err.message);
-                                                log(response);
-                                            });
-                                            break;
-                                        case "run":
-                                            log('Roomba is still running. Will check again in 3 seconds');
-                                            checkStatus(3000);
-                                            break;
-                                        default:
-                                            myRobotViaLocal.end();
-                                            log('Roomba is not running');
-                                            break;
-                                    }
-
-                                })).catch(function (err) {
-                                    log(err);
-                                });
-
-                            }, time
-                        );
-                    };
-
-                    checkStatus(3000);
-
-                }).catch((err) => {
-
-                    log('Stopping/docking Roomba failed: %s', err.message);
-                    log(response);
-                    callback(err);
-
-                });
+                        myRobotViaLocal.dock().then(function(response) {
+                          log('Roomba docking');
+                          myRobotViaLocal.end();
+                        });
+                        break;
+                      case "run":
+                        log('Roomba is still running. Will check again in 3 seconds');
+                        checkStatus(3000);
+                        break;
+                      default:
+                        myRobotViaLocal.end();
+                        log('Roomba is not running');
+                        break;
+                    }
+                  });
+                }, time);
+              };
+              checkStatus(3000);
             });
-        }
+          } else {
+            log("Roomba is already in state");
+            callback();
+          }
+        }).catch(function(err) {
+          myRobotViaLocal.end();
+          log("Error setting power state to [%s]. Error was [%s]", state, err.message);
+          callback(err);
+        });
+      });
     },
     /* End setPowerState */
 
   /**
    * getPowerState
    *
-   * @method getPowerState   
+   * @method getPowerState
    * @param {function} callback
    * @return {Number} status
    *
@@ -202,7 +168,7 @@ Roomba690Accessory.prototype = {
                         log("Roomba is not running");
                         callback(null, 0);
                         break;
-                }                
+                }
 
             })).catch(function(err) {
 
@@ -273,7 +239,7 @@ Roomba690Accessory.prototype = {
   /**
    * getBatteryLevel
    *
-   * @method getBatteryLevel   
+   * @method getBatteryLevel
    * @param {function} callback
    * @return {Number} batteryLevel
    *
@@ -295,7 +261,7 @@ Roomba690Accessory.prototype = {
 
                 myRobotViaLocal.end();
 
-                log("Roomba battery level [%s]", state.batPct);  
+                log("Roomba battery level [%s]", state.batPct);
                 callback(null, state.batPct);
 
             })).catch(function(err) {
@@ -303,7 +269,7 @@ Roomba690Accessory.prototype = {
                 myRobotViaLocal.end();
 
                 log("Unable to determine battery level");
-                log(err);                
+                log(err);
                 callback(err);
 
             });
@@ -320,7 +286,7 @@ Roomba690Accessory.prototype = {
    *
    * As we can't yet do that, this method will always return successful to keep Siri happy.
    *
-   * @method identify   
+   * @method identify
    * @param {function} callback
    *
    */
@@ -337,7 +303,7 @@ Roomba690Accessory.prototype = {
    * BatteryService
    * Switch
    *
-   * @method identify   
+   * @method identify
    * @param {function} callback
    * @return {Array} services
    *
