@@ -71,7 +71,7 @@ Roomba690Accessory.prototype = {
 
         myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(currentState) {
           var phase = currentState.cleanMissionStatus.phase;
-          log("Roomba status is %s", currentState);
+          log("Roomba status is %s", JSON.stringify(currentState, null, 4));
 
           if (state) {
             if (phase == "stuck") {
@@ -180,7 +180,7 @@ Roomba690Accessory.prototype = {
 
                 myRobotViaLocal.end();
 
-                log("Roomba status is %s", state);
+                log("Roomba status is %s", JSON.stringify(state, null, 4));
 
                 switch (state.cleanMissionStatus.phase) {
                     case "run":
