@@ -70,7 +70,7 @@ Roomba690Accessory.prototype = {
         log("Connected to Roomba, getting current status");
 
         myRobotViaLocal.getRobotState(['cleanMissionStatus']).then(function(currentState) {
-          log("Roomba status is %s", JSON.stringify(currentState, null, 4));
+          log("Roomba status is %s", JSON.stringify(currentState.cleanMissionStatus, null, 4));
 
           if (currentState.cleanMissionStatus.notReady) {
             log("Roomba is not ready %s", currentState.cleanMissionStatus.notReady);
@@ -184,7 +184,7 @@ Roomba690Accessory.prototype = {
             myRobotViaLocal.getRobotState(['cleanMissionStatus']).then((function(state) {
                 myRobotViaLocal.end();
 
-                log("Roomba status is %s", JSON.stringify(state, null, 4));
+                log("Roomba status is %s", JSON.stringify(state.cleanMissionStatus, null, 4));
 
                 if (state.cleanMissionStatus.notReady) {
                   log("Roomba is not ready %s", state.cleanMissionStatus.notReady);
